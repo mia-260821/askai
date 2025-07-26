@@ -59,8 +59,5 @@ func NewGeminiClient(apiKey string, model string) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &GeminiClient{
-		client: client,
-		model:  model,
-	}, nil
+	return &GeminiClient{client: client, model: model}, nil
 }
