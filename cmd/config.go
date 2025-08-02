@@ -1,13 +1,12 @@
 package cmd
 
 import (
-	"bufio"
+	"askai/lib/utils"
 	"fmt"
-	"os"
-	"strings"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
+	"strings"
 )
 
 var configCmd = &cobra.Command{
@@ -32,22 +31,19 @@ var editConfigCmd = &cobra.Command{
 	Use:   "edit",
 	Short: "Interactively configure model and API key",
 	Run: func(cmd *cobra.Command, args []string) {
-		scanner := bufio.NewScanner(os.Stdin)
+		text := utils.Input("Enter provider: ")
+		viper.Set("provider", text)
 
-		fmt.Print("Enter provider: ")
-		if scanner.Scan() {
-			text := strings.TrimSpace(scanner.Text())
-			viper.Set("provider", text)
-		}
-		fmt.Print("Enter model: ")
-		if scanner.Scan() {
-			text := strings.TrimSpace(scanner.Text())
-			viper.Set("model", text)
-		}
-		fmt.Print("Enter API key: ")
-		if scanner.Scan() {
-			text := strings.TrimSpace(scanner.Text())
-			viper.Set("api_key", text)
+		text = utils.Input("Enter model: ")
+		viper.Set("model", text)
+
+		text = utils.Input("Enter API key: ")
+		viper.Set("api_key", text)
+
+		text = utils.Input("Enable rate limit (Y/N): ", utils.EmptyNotAllowed())
+		if strings.ToLower(text) == "y" {
+			text = utils.Input("Enter maximum llm callings per minute: ", utils.PositiveIntegerOnly())
+			viper.Set("rate_limit", text)
 		}
 
 		if err := viper.WriteConfig(); err != nil {

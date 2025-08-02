@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"askai/lib/llm"
+	"askai/lib/utils"
 	"bufio"
 	"context"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 	"os"
 	"strings"
+	"time"
 )
 
 const (
@@ -17,7 +19,8 @@ const (
 )
 
 var (
-	chatClient llm.ChatClient
+	chatClient  llm.ChatClient
+	rateLimiter utils.RateLimiter
 )
 
 func initLLMClient() (err error) {
@@ -49,6 +52,11 @@ var chatCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		rate := viper.GetInt("rate_limit")
+		if rate > 0 {
+			rateLimiter = utils.NewTokenBucket(ctx, rate, rate, time.Minute)
+		}
+
 		session, err := chatClient.NewSession(ctx)
 		if err != nil {
 			cobra.CheckErr(err)
@@ -56,6 +64,17 @@ var chatCmd = &cobra.Command{
 
 		scanner := bufio.NewScanner(os.Stdin)
 		for {
+			if rateLimiter != nil && !rateLimiter.Allow() {
+				fmt.Println("rate limit exceeded, please wait for a moment ...")
+				allowed, err := rateLimiter.WaitWithTimeout(ctx, time.Minute)
+				if err != nil {
+					cobra.CheckErr(err)
+				}
+				if !allowed {
+					continue
+				}
+			}
+
 			fmt.Print("User > ")
 			if !scanner.Scan() {
 				cobra.CheckErr(scanner.Err())
@@ -67,6 +86,7 @@ var chatCmd = &cobra.Command{
 			} else if input == "" {
 				continue
 			}
+
 			ch, err := session.Send(input)
 			if err != nil {
 				cobra.CheckErr(scanner.Err())
